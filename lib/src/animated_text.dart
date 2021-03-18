@@ -1,9 +1,27 @@
 import 'dart:async';
 import 'dart:math';
+
 import 'package:flutter/material.dart';
 
 /// Abstract base class for text animations.
 abstract class AnimatedText {
+  AnimatedText({
+    @required this.text,
+    this.textAlign = TextAlign.start,
+    @required this.textStyle,
+    @required this.duration,
+  })  : assert(null != text),
+        assert(null != textAlign),
+        assert(null != textStyle),
+        assert(null != duration),
+        textCharacters = text.characters;
+
+  /// Return the remaining Duration for the Animation (when applicable).
+  Duration get remaining => null;
+
+  /// Initialize the Animation.
+  void initAnimation(AnimationController controller);
+
   /// Text for [Text] widget.
   final String text;
 
@@ -28,23 +46,6 @@ abstract class AnimatedText {
   /// Unicode and Emojis.
   final Characters textCharacters;
 
-  AnimatedText({
-    @required this.text,
-    this.textAlign = TextAlign.start,
-    @required this.textStyle,
-    @required this.duration,
-  })  : assert(null != text),
-        assert(null != textAlign),
-        assert(null != textStyle),
-        assert(null != duration),
-        textCharacters = text.characters;
-
-  /// Return the remaining Duration for the Animation (when applicable).
-  Duration get remaining => null;
-
-  /// Initialize the Animation.
-  void initAnimation(AnimationController controller);
-
   /// Utility method to create a styled [Text] widget using the [textAlign] and
   /// [textStyle], but you can specify the [data].
   Widget textWidget(String data) => Text(
@@ -63,6 +64,33 @@ abstract class AnimatedText {
 
 /// Base class for Animated Text widgets.
 class AnimatedTextKit extends StatefulWidget {
+  const AnimatedTextKit({
+    Key key,
+    @required this.animatedTexts,
+    this.pause = const Duration(milliseconds: 1000),
+    this.displayFullTextOnTap = false,
+    this.stopPauseOnTap = false,
+    this.showLastOnFinished = true,
+    this.onTap,
+    this.onNext,
+    this.onNextBeforePause,
+    this.onFinished,
+    this.isRepeatingAnimation = true,
+    this.totalRepeatCount = 3,
+    this.repeatForever = false,
+  })  : assert(null != animatedTexts && animatedTexts.length > 0),
+        assert(null != pause),
+        assert(null != displayFullTextOnTap),
+        assert(null != stopPauseOnTap),
+        assert(null != isRepeatingAnimation),
+        assert(null != repeatForever),
+        assert(
+            !isRepeatingAnimation || null != totalRepeatCount || repeatForever),
+        assert(null == onFinished || !repeatForever),
+        super(key: key);
+
+  final bool showLastOnFinished;
+
   /// List of [AnimatedText] to display subsequently in the animation.
   final List<AnimatedText> animatedTexts;
 
@@ -115,30 +143,6 @@ class AnimatedTextKit extends StatefulWidget {
   /// By default it is set to 3
   final int totalRepeatCount;
 
-  const AnimatedTextKit({
-    Key key,
-    @required this.animatedTexts,
-    this.pause = const Duration(milliseconds: 1000),
-    this.displayFullTextOnTap = false,
-    this.stopPauseOnTap = false,
-    this.onTap,
-    this.onNext,
-    this.onNextBeforePause,
-    this.onFinished,
-    this.isRepeatingAnimation = true,
-    this.totalRepeatCount = 3,
-    this.repeatForever = false,
-  })  : assert(null != animatedTexts && animatedTexts.length > 0),
-        assert(null != pause),
-        assert(null != displayFullTextOnTap),
-        assert(null != stopPauseOnTap),
-        assert(null != isRepeatingAnimation),
-        assert(null != repeatForever),
-        assert(
-            !isRepeatingAnimation || null != totalRepeatCount || repeatForever),
-        assert(null == onFinished || !repeatForever),
-        super(key: key);
-
   /// Creates the mutable state for this widget. See [StatefulWidget.createState].
   @override
   _AnimatedTextKitState createState() => _AnimatedTextKitState();
@@ -181,8 +185,8 @@ class _AnimatedTextKitState extends State<AnimatedTextKit>
           ? completeText
           : AnimatedBuilder(
               animation: _controller,
-              child: completeText,
               builder: _currentAnimatedText.animatedBuilder,
+              child: completeText,
             ),
     );
   }
@@ -197,18 +201,20 @@ class _AnimatedTextKitState extends State<AnimatedTextKit>
     // Handling onNext callback
     widget.onNext?.call(_index, isLast);
 
-    if (isLast) {
-      if (widget.isRepeatingAnimation &&
-          (widget.repeatForever ||
-              _currentRepeatCount != (widget.totalRepeatCount - 1))) {
-        _index = 0;
-        if (!widget.repeatForever) {
-          _currentRepeatCount++;
-        }
-      } else {
-        widget.onFinished?.call();
-        return;
+    if (isLast &&
+        widget.isRepeatingAnimation &&
+        (widget.repeatForever ||
+            _currentRepeatCount != (widget.totalRepeatCount - 1))) {
+      _index = 0;
+      if (!widget.repeatForever) {
+        _currentRepeatCount++;
       }
+    } else if (isLast) {
+      if (widget.showLastOnFinished) {
+        _controller.stop();
+      }
+      widget.onFinished?.call();
+      return;
     } else {
       _index++;
     }
