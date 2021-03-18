@@ -212,8 +212,9 @@ class _AnimatedTextKitState extends State<AnimatedTextKit>
     } else if (isLast) {
       if (widget.showLastOnFinished) {
         _controller.stop();
+      }else{
+        widget.onFinished?.call();
       }
-      widget.onFinished?.call();
       return;
     } else {
       _index++;
